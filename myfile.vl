@@ -1,0 +1,127 @@
+// Components used:
+// Full-adders: 3
+// 4x1 Multiplexers: 3
+// 2x1 Multiplexers: 3
+// XOR: 3
+/*
+* When s1s0 are 00, G = A+1
+* When s1s0 are 01, G = A+B
+* When s1s0 are 10, G = B-A = B+~A+1
+* When s1s0 are 11, G = 1-B = 1+~B+1
+  (in the 2nd and 3rd case we used XOR to get ~A and ~B "complement" by entering 1  with A and B)
+*/
+
+// Structural Verilog description
+
+// Here, I've created a module for half-adder to be used in the full-adder
+module half_adder(output sum, output carry, input a, input b);
+   // XOR gate to compute the sum
+   xor(sum, a, b);
+   // AND gate to compute the carry
+   and(carry, a, b);
+// end the module
+endmodule
+
+// Here, I've created a module for full-adder using half-adder
+module full_adder(output sum, output carry, input x, input y, input z);
+   //Declare wires for intermediate signals
+   wire s1, c1, c2;
+   //Instantiate the first half-adder
+   half_adder h1(s1, c1, x, y);
+   //Instantiate the second half-adder
+   half_adder h2(sum, c2, s1, z);
+   //OR gate combines the carry outputs
+   or(carry, c1, c2);
+//end the module
+endmodule
+
+// Here, I've created a module for 2x1 Multiplexer as the book and the lecture
+module Mux2x1(output y, input i0, input i1, input s0);
+   //Declare intermediate wires
+   wire I0, I1;
+   //AND gates for implementing the logic of the mux
+   and(I0, i0, ~s0);
+   and(I1, i1, s0);
+   // OR gate for implementing the logic of the mux
+   or(y, I0, I1);
+//end the module
+endmodule
+
+// Here, I've created a module for 4x1 Multiplexer as the book and the lecture
+module Mux4x1(output y, input i0, input i1, input i2,input i3, input s0, input s1);
+   // Declare intermediate wires
+   wire I0, I1, I2, I3;
+   //AND gates for implementing the logic of the mux
+   and(I0, i0, ~s0, ~s1);
+   and(I1, i1, ~s0, s1);
+   and(I2, i2, s0, ~s1);
+   and(I3, i3, s0, s1);
+   // OR gates for implementing the logic of the mux
+   or(y, I0, I1, I2, I3);
+//end the module
+endmodule
+
+// Here, I've created a module for the circuit to calculate according to the selection inputs
+module circuit(output [2:0] G, output carry, input [1:0] sel, input [2:0] A, input [2:0] B);
+  // Declare intermediate wires
+  wire [2:0]l, x, m, c1, c2;
+  // making variable storing one and another one to store zero
+  assign zero = 1'b0;
+  assign one = 1'b1;
+  
+  // First set of multiplexer, full-adder blocks (per the 1st bit)
+  Mux2x1 M00(l[0], A[0], B[0], sel[0]);
+  Mux4x1 M01(m[0], one, A[0], B[0], one, sel[1], sel[0]);
+  xor(x[0], l[0], sel[1]);
+  full_adder f0(.sum(G[0]), .carry(c1), .x(x[0]), .y(m[0]), .z(sel[1]));
+  
+  // Second set of multiplexer, full-adder blocks (per the 2nd bit)
+  Mux2x1 M10(l[1], A[1], B[1], sel[0]);
+  Mux4x1 M11(m[1], zero, A[1], B[1], zero, sel[1], sel[0]);
+  xor(x[1], l[1], sel[1]);
+  full_adder f1(.sum(G[1]), .carry(c2), .x(x[1]), .y(m[1]), .z(c1));
+  
+  // Third set of multiplexer, full-adder blocks (per the 3rd bit)
+  Mux2x1 M20(l[2], A[2], B[2], sel[0]);
+  Mux4x1 M21(m[2], zero, A[2], B[2], zero, sel[1], sel[0]);
+  xor(x[2], l[2], sel[1]);
+  full_adder f2(.sum(G[2]), .carry(carry), .x(x[2]), .y(m[2]), .z(c2));
+endmodule
+
+// Behavioral Verilog description for the test bench.
+module circut_test;
+   // registers to store A and  A and the selection inputs
+   reg [2:0] A, B;
+   reg [1:0] sel;
+    // Declare intermediate wires
+   wire [2:0] G;
+   wire carry;
+   // calling the module function
+   circuit cir(G, carry, sel, A, B);
+   initial begin
+      $monitor($time, " G=%b, carry=%b, sel=%b, A=%b, B=%b", G, carry, sel, A, B);  //Prints simulation time and binary values whenever the monitored signals change
+      //Initialize inputs
+      // A initialized A by zero
+      A = 3'b000;
+      // B initialized B by zero
+      B = 3'b000;
+      //the selection inputs by zero
+      sel = 2'b00;
+      //Test case loop
+      //creating a to iterate through the 40-test_bench, then stat the loop.
+      for(integer i=0; i<40; i=i+1)
+      //the loop has been started.
+      begin
+        //every "10" sec, all the inputs generate randomly at each iteration.
+        #10 sel<=$random;A<=$random;B<=$random;
+        //the loop has been ended after finishing 40 iterations.
+      end
+      //finish simulation (monitor).
+      $finish;
+      //the sec has been ended.
+   end
+//end the circuit_test module.
+endmodule
+
+
+
